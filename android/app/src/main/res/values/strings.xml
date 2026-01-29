@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">动态公网</string>
+    <string name="refresh">刷新</string>
+    <string name="empty_tip">暂无可用的导航链接</string>
+    <string name="delete_confirm">确定要删除链接 "%s" 吗？此操作不可恢复。</string>
+    <string name="delete_success">删除成功</string>
+    <string name="delete_failed">删除失败，请重试</string>
+    <string name="load_failed">加载失败，请重试</string>
+    <string name="app_title">动态公网监控</string>
+</resources>
