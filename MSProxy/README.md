@@ -21,6 +21,7 @@ MSProxy 是一个运行在 Cloudflare Workers 上的多站代理服务，它允�
 - **跨域支持**：默认添加 `Access-Control-Allow-Origin: *` 头，支持跨域访问
 - **防反爬处理**：自动处理请求头，避免目标站点的反爬机制
 - **友好的管理界面**：根路径提供代理列表页面，方便查看和管理
+- **本地可访问性测试**：浏览器客户端自动测试被代理地址是否能直接访问，并在列表中显示访问状态
 
 ## 🚀 快速开始
 
@@ -53,8 +54,9 @@ MSProxy 是一个运行在 Cloudflare Workers 上的多站代理服务，它允�
 
 ### 访问代理服务
 
-1. **查看代理列表**：访问 Worker 根路径（如 `https://your-worker-name.cloudflareworkers.com/`），您将看到所有配置的代理列表
-2. **使用代理**：通过路径访问具体代理，如 `https://your-worker-name.cloudflareworkers.com/1` 对应第一个代理目标
+1. **查看代理列表**：访问 Worker 根路径（如 `https://your-worker-name.cloudflareworkers.com/`），您将看到所有配置的代理列表，包括每个代理的访问状态
+2. **查看访问状态**：每个代理条目后面会显示访问状态，绿色的 "✅无需代理" 表示可以直接访问，红色的 "需代理" 表示需要通过代理访问
+3. **使用代理**：通过路径访问具体代理，如 `https://your-worker-name.cloudflareworkers.com/1` 对应第一个代理目标
 
 ### 示例请求
 
@@ -103,6 +105,7 @@ curl "https://your-worker-name.cloudflareworkers.com/2?param1=value1&param2=valu
 - **Cloudflare Workers**：无服务器执行环境，提供全球边缘部署
 - **Fetch API**：用于发起 HTTP 请求
 - **Promise.race**：实现请求超时控制
+- **客户端检测**：浏览器端使用 Fetch API 和 AbortController 测试地址可访问性
 - **响应处理**：修改响应头，添加跨域支持和缓存控制
 
 ## 📁 项目结构

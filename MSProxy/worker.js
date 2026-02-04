@@ -151,9 +151,15 @@ const proxyListHtml = proxyArray.map(([name, targetUrlStr], index) => {
   const path = `/${index + 1}`;
   const proxyUrl = `${url.origin}${path}`; // 代理访问地址（域名/1、域名/2）
   const originalUrl = targetUrlStr; // 被代理的原始地址（从远程配置中读取）
-  // 显示格式：名称：可点击代理地址 → 被代理原始地址（区分样式，更易读）
-  return `${name}：<a href="${proxyUrl}" target="_blank" style="color:#1677ff;text-decoration:none;">${proxyUrl}</a> → <span style="color:#666;">${originalUrl}</span>`;
-}).join('<br>');
+  
+  // 显示格式：名称：可点击代理地址 → 被代理原始地址 → 访问状态（区分样式，更易读）
+  return `<div class="proxy-item" data-url="${originalUrl}">
+    ${name}：<a href="${proxyUrl}" target="_blank" style="color:#1677ff;text-decoration:none;">${proxyUrl}</a> → 
+    <span style="color:#666;">${originalUrl}</span> → 
+    <span class="access-status" style="font-weight:bold;">检测中...</span>
+    <span class="test-info" style="font-size:12px;color:#999;margin-left:10px;"></span>
+  </div>`;
+}).join('');
 
 return new Response(`
   <!DOCTYPE html>
@@ -162,13 +168,95 @@ return new Response(`
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多站代理服务</title>
-    <style>body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#f5f5f5;} .container{max-width:1000px;margin:50px auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.1);} h1{text-align:center;color:#333;margin-bottom:30px;} a{word-break:break-all;} span{word-break:break-all;}</style>
+    <style>
+      body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#f5f5f5;}
+      .container{max-width:1000px;margin:50px auto;background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.1);}
+      h1{text-align:center;color:#333;margin-bottom:30px;}
+      a{word-break:break-all;}
+      span{word-break:break-all;}
+      .proxy-item{margin-bottom:10px;line-height:1.8;}
+      .access-status{min-width:80px;display:inline-block;}
+      .test-info{max-width:300px;display:inline-block;}
+      .test-btn{margin-left:10px;padding:2px 8px;font-size:12px;border:none;border-radius:4px;background:#1677ff;color:white;cursor:pointer;}
+      .test-btn:hover{background:#40a9ff;}
+    </style>
   </head>
   <body>
     <div class="container">
       <h1>✅ 多站代理服务运行中</h1>
-      <div style="font-size:16px;line-height:2;">${proxyListHtml}</div>
+      <div style="font-size:16px;">${proxyListHtml}</div>
+      <button id="test-all" style="margin-top:20px;padding:8px 16px;font-size:14px;border:none;border-radius:4px;background:#1677ff;color:white;cursor:pointer;">一键检测所有地址</button>
+      <div style="margin-top:10px;font-size:12px;color:#666;">
+        <p>测试说明：</p>
+        <ul>
+          <li>系统会自动使用无跨域模式测试每个地址的可访问性</li>
+          <li>✅无需代理：表示可以直接访问，不需要通过代理</li>
+          <li>需代理：表示需要通过代理才能访问</li>
+          <li>测试结果仅供参考，实际访问请点击链接测试</li>
+        </ul>
+      </div>
     </div>
+    <script>
+      // 测试单个地址的可访问性（仅使用无跨域模式）
+      async function testAccessibility(url, element, infoElement) {
+        try {
+          element.textContent = '检测中...';
+          element.style.color = '#1890ff';
+          infoElement.textContent = '';
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            signal: controller.signal,
+            mode: 'no-cors', // 仅使用无跨域模式
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0.0.0 Safari/537.36',
+              'Accept': '*/*'
+            }
+          });
+          
+          clearTimeout(timeoutId);
+          
+          // 只要能收到响应，就认为可以访问
+          element.textContent = '✅无需代理';
+          element.style.color = '#52c41a';
+          infoElement.textContent = '测试成功';
+        } catch (error) {
+          // 详细的错误处理
+          if (error.name === 'AbortError') {
+            element.textContent = '需代理';
+            infoElement.textContent = '错误: 请求超时';
+          } else {
+            element.textContent = '需代理';
+            infoElement.textContent = '错误：' + error.message;
+          }
+          element.style.color = '#ff4d4f';
+        }
+      }
+      
+      // 测试所有地址
+      async function testAllAccessibility() {
+        const proxyItems = document.querySelectorAll('.proxy-item');
+        for (const item of proxyItems) {
+          const url = item.dataset.url;
+          const statusElement = item.querySelector('.access-status');
+          const infoElement = item.querySelector('.test-info');
+          await testAccessibility(url, statusElement, infoElement);
+        }
+      }
+      
+      // 绑定事件监听器
+      window.addEventListener('load', function() {
+        // 页面加载完成后自动测试所有地址
+        testAllAccessibility();
+        
+        // 绑定一键测试按钮事件
+        document.getElementById('test-all').addEventListener('click', testAllAccessibility);
+      });
+    </script>
   </body>
   </html>
 `, { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
