@@ -151,7 +151,22 @@ Toolbox/
    - 支持查看和管理书签
    - 支持分类浏览
    - 响应式界面设计
+# YutuCMS(JCSQL) 飞牛X86 Docker 一键部署
+适配：飞牛 fnOS X86 架构 | PHP5.6 + Apache | 自动修复依赖/权限/验证码
 
+## 环境要求
+- 系统：飞牛NAS(X86)
+- 已开启 Docker 功能
+- 可正常访问外网
+
+## 部署路径
+项目挂载目录：`/vol1/1000/docker/yutu`
+端口：`8000`
+
+## 快速部署
+### 1. 在线执行脚本（推荐）
+```bash
+curl -fsSL https://raw.githubusercontent.com/你的用户名/仓库名/main/deploy.sh | bash
 ## � 常见问题
 
 ### Q: 服务启动失败怎么办？
