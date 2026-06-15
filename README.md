@@ -167,6 +167,9 @@ Toolbox/
 ### 1. 在线执行脚本（推荐）
 ```bash
 curl -fsSL https://raw.githubusercontent.com/你的用户名/仓库名/main/deploy.sh | bash
+
+——————————————————————————————————————————————————————
+
 ## � 常见问题
 
 ### Q: 服务启动失败怎么办？
