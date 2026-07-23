@@ -1,18 +1,19 @@
 # Toolbox - 实用工具集合
 
-> 基于 Cloudflare Workers 的实用工具集合，包含链接管理、个人导航和多站代理服务
+> 基于 Cloudflare Workers 的实用工具集合，并包含 NAS 上的 Docker 一键部署脚本
 
 ## 📋 项目简介
 
-Toolbox 是一个基于 Cloudflare Workers 的实用工具集合，包含三个核心项目：
+Toolbox 是一个实用工具集合，包含四个项目：
 
 1. **DPNAddress** - 基于 D1 数据库的链接管理与重定向服务
 2. **Homepage** - 个人网址导航服务，支持书签分类管理
-3. **MSProxy** - 多站代理服务，支持远程配置管理
+3. **MSProxy** - 多站代理服务，D1 配置 + 子域名透传 + 网页可视化管理
+4. **YutuCMS** - 玉兔CMS 在飞牛 NAS 上的 Docker 一键部署脚本
 
-这些工具都运行在 Cloudflare Workers 上，具有全球边缘部署、低延迟访问的优势。
+前三个工具运行在 Cloudflare Workers 上，具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
 
-## � 项目结构
+## 📁 项目结构
 
 ```
 Toolbox/
@@ -26,6 +27,9 @@ Toolbox/
 │   └── readme_home.md   # 项目文档
 ├── MSProxy/             # 多站代理服务
 │   ├── worker.js        # Cloudflare Worker 主代码
+│   └── README.md        # 项目文档
+├── YutuCMS/             # 玉兔CMS 飞牛NAS 一键部署
+│   ├── deploy.sh        # Docker 一键部署脚本
 │   └── README.md        # 项目文档
 ├── README.md            # 本文件 - 项目总览
 └── 其他文档文件...
@@ -89,40 +93,57 @@ Toolbox/
 ### 3. MSProxy - 多站代理服务
 
 **核心功能**：
-- 支持通过远程 JSON 配置文件管理多个代理目标
-- 提供缓存机制（5分钟），减少重复请求
-- 支持跨域访问，添加 `Access-Control-Allow-Origin: *` 头
-- 提供代理列表页面，显示所有代理目标
-- 防反爬处理，自动修改请求头
-- 请求超时保护（10秒）
+- 配置存入 Cloudflare D1 数据库，首次访问自动建表
+- 子域名整站透传（`N.域名/任意路径`），被代理站下级菜单/链接正常
+- 路径代理（`域名/N`）向后兼容
+- 网页可视化管理：密码保护下增/删/改配置
+- 5 分钟内存缓存 + 10 秒超时保护
+- 跨域支持 + 防反爬处理
 
 **技术栈**：
 - Cloudflare Workers
+- Cloudflare D1 数据库
 - JavaScript (ES Module)
-- HTML5/CSS3
 
 **使用方法**：
 1. 部署 `worker.js` 到 Cloudflare Workers
-2. 修改 `REMOTE_CONFIG_URL` 为你的远程配置文件 URL
-3. 配置远程 JSON 文件，格式如下：
-   ```json
-   {
-     "代理名称1": "https://目标站点1/api路径",
-     "代理名称2": "https://目标站点2/api路径"
-   }
-   ```
-4. 通过 `域名/1`、`域名/2` 等路径访问对应代理
+2. 绑定 D1 数据库（变量名 `DB`），配置 `ADMIN_PASSWORD` 环境变量
+3. （推荐）配置通配符 DNS 与 Worker 路由启用子域名透传
+4. 访问根路径点「管理」添加配置，通过 `N.域名` 或 `域名/N` 访问代理
+
+> 详见 [MSProxy/README.md](MSProxy/README.md)
+
+### 4. YutuCMS - 玉兔CMS 飞牛NAS 一键部署
+
+**核心功能**：
+- 玉兔CMS(JCSQL) 在飞牛 fnOS X86 上的 Docker 一键部署
+- 自动修复 Docker 权限、APT 源、PHP 扩展依赖
+- 自动安装 zip/GD 扩展（验证码所需）并配置目录权限
+- 全流程检查，失败即报错
+
+**技术栈**：
+- Docker / docker-compose
+- PHP 5.6 + Apache
+- Bash 脚本
+
+**使用方法**：
+```bash
+curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deploy.sh | bash
+```
+部署完成后访问 `http://NAS内网IP:8000`，上传 YutuCMS 源码到 `/vol1/1000/docker/yutu`。
+
+> 详见 [YutuCMS/README.md](YutuCMS/README.md)
 
 ## 🔧 部署指南
 
 ### 前提条件
 
-- Cloudflare 账户
-- Cloudflare Workers 订阅
-- 对于 DPNAddress：Cloudflare D1 数据库
+- Cloudflare 账户（DPNAddress / Homepage / MSProxy）
+- 飞牛 NAS fnOS X86 + Docker（YutuCMS）
+- 对于 DPNAddress / MSProxy：Cloudflare D1 数据库
 - 对于 Homepage：Cloudflare KV 存储
 
-### 通用部署步骤
+### 通用部署步骤（Cloudflare Workers 项目）
 
 1. **登录 Cloudflare 控制台**
 2. **创建 Worker**：
@@ -130,13 +151,15 @@ Toolbox/
    - 点击 "Create Worker"
    - 命名你的 Worker，然后点击 "Deploy"
 3. **配置绑定**：
-   - 对于 DPNAddress：添加 D1 数据库绑定，名称为 `DB`
+   - 对于 DPNAddress / MSProxy：添加 D1 数据库绑定，名称为 `DB`
    - 对于 Homepage：添加 KV 命名空间绑定，名称为 `BOOKMARKS_KV`
 4. **部署代码**：
    - 进入 Worker 编辑页面
    - 复制对应项目的 Worker 代码到编辑器
-   - 修改必要的配置项（如远程配置 URL）
+   - 配置必要的环境变量（如 MSProxy 的 `ADMIN_PASSWORD`）
    - 点击 "Save and Deploy"
+
+> YutuCMS 为 NAS 本地 Docker 部署，见其 [README](YutuCMS/README.md)。
 
 ## 📱 Android 客户端
 
@@ -151,33 +174,14 @@ Toolbox/
    - 支持查看和管理书签
    - 支持分类浏览
    - 响应式界面设计
-## YutuCMS(JCSQL) 飞牛X86 Docker 一键部署
-适配：飞牛 fnOS X86 架构 | PHP5.6 + Apache | 自动修复依赖/权限/验证码
 
-## 环境要求
-- 系统：飞牛NAS(X86)
-- 已开启 Docker 功能
-- 可正常访问外网
-
-## 部署路径
-项目挂载目录：`/vol1/1000/docker/yutu`
-端口：`8000`
-
-## 快速部署
-### 1. 在线执行脚本（推荐）
-```bash
-curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/deploy.sh | bash
-```
-
-
-## � 常见问题
+## 🔍 常见问题
 
 ### Q: 服务启动失败怎么办？
 
 **A:** 检查以下几点：
 - Cloudflare Workers 订阅是否有效
 - 数据库或存储绑定是否正确配置
-- 远程配置文件（如果使用）是否可访问
 - 代码是否有语法错误
 
 ### Q: 如何更新配置？
@@ -185,12 +189,13 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/deploy.sh | b
 **A:** 
 - 对于 DPNAddress：通过 POST 请求添加或更新链接
 - 对于 Homepage：在界面上直接添加、编辑或删除书签
-- 对于 MSProxy：更新远程 JSON 配置文件，服务会自动加载（最多延迟 5 分钟）
+- 对于 MSProxy：访问根路径点「管理」，在网页上增/删/改配置（即时生效）
+- 对于 YutuCMS：修改 `deploy.sh` 顶部配置变量后重新执行
 
 ### Q: 如何提高安全性？
 
 **A:** 
-- 对于 Homepage：设置强密码并定期更换
+- 对于 Homepage / MSProxy：设置强管理密码并定期更换
 - 对于 DPNAddress：考虑添加访问控制，限制只有特定 IP 可以修改链接
 - 对于 MSProxy：避免代理敏感内容，定期检查代理目标
 
