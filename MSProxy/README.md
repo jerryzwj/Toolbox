@@ -1,112 +1,176 @@
 # MSProxy - 多站代理服务
 
-> 基于 Cloudflare Workers 的轻量级多站代理服务
+> 基于 Cloudflare Workers + D1 数据库的多站代理服务，支持子域名整站透传与网页可视化管理
 
 ## 📋 项目简介
 
-MSProxy 是一个运行在 Cloudflare Workers 上的多站代理服务，它允许您通过远程 JSON 配置文件管理多个代理目标，无需修改代码即可动态更新代理规则。
+MSProxy 是一个运行在 Cloudflare Workers 上的多站代理服务。代理配置存入 D1 数据库，内置网页管理面板（增/删/改，密码保护），并支持子域名整站透传，彻底解决被代理站点下级菜单/链接跳转错误的问题。
 
 **核心价值**：
-- 解决跨域访问问题，允许前端应用安全访问受限制的 API
-- 统一管理多个代理目标，通过远程配置实现动态更新
-- 提供缓存机制，减少重复请求，提升性能
-- 轻量级设计，运行在 Cloudflare Workers 上，全球访问速度快
+- 配置存入 D1 数据库，网页端可视化管理，无需改代码或进后台
+- 子域名整站透传，被代理站的菜单/分页/详情页链接全部正常
+- 解决跨域访问问题，前端可安全访问受限 API
+- 5 分钟缓存 + 10 秒超时保护，性能与稳定性兼顾
 
 ## ✨ 核心特性
 
-- **远程配置管理**：通过远程 JSON 文件管理代理规则，无需修改代码即可更新
-- **多站代理**：支持同时代理多个目标站点，通过路径区分（如 `/1`, `/2` 等）
-- **智能缓存**：内置 5 分钟缓存机制，减少重复请求，提升性能
-- **超时保护**：所有请求均有 10 秒超时保护，避免服务阻塞
-- **跨域支持**：默认添加 `Access-Control-Allow-Origin: *` 头，支持跨域访问
-- **防反爬处理**：自动处理请求头，避免目标站点的反爬机制
-- **友好的管理界面**：根路径提供代理列表页面，方便查看和管理
-- **本地可访问性测试**：浏览器客户端自动测试被代理地址是否能直接访问，并在列表中显示访问状态
+- **D1 数据库存储**：配置存入 Cloudflare D1，首次请求自动建表，无需手动初始化
+- **网页可视化管理**：内置管理面板，密码登录后可在网页上增/删/改配置
+- **子域名透传（推荐）**：`N.域名/任意路径` 整站代理，页面内所有链接天然正确
+- **路径代理（兼容）**：`域名/N` 仍可用，向后兼容已有引用
+- **密码保护**：管理功能通过 `ADMIN_PASSWORD` 环境变量鉴权，未配置时禁用（默认安全）
+- **智能缓存**：5 分钟内存缓存，增删配置后即时失效
+- **超时保护**：10 秒超时，避免服务阻塞
+- **跨域 + 防反爬**：自动添加 CORS 头、伪装请求头
 
 ## 🚀 快速开始
 
-### 1. 部署到 Cloudflare Workers
+### 1. 部署 Worker
 
-1. **准备 Cloudflare 账户**：确保您拥有 Cloudflare 账户
-2. **创建 Worker**：
-   - 登录 Cloudflare 仪表板
-   - 导航到 "Workers & Pages"
-   - 点击 "Create Worker"
-   - 命名您的 Worker，然后点击 "Deploy"
-3. **部署代码**：
-   - 进入 Worker 编辑页面
-   - 复制 `worker.js` 的内容到编辑器
-   - 修改 `REMOTE_CONFIG_URL` 为您的远程配置文件 URL
-   - 点击 "Save and Deploy"
+1. Cloudflare Dashboard → Workers & Pages → Create Worker
+2. 复制 `worker.js` 内容到编辑器 → Save and Deploy
 
-### 2. 配置远程 JSON 文件
+### 2. 创建并绑定 D1 数据库
 
-创建一个公开可访问的 JSON 文件（推荐使用 GitHub Gist 或 GitHub 仓库），格式如下：
+1. **创建数据库**：Dashboard → Workers & Pages → D1 → Create database（如 `toolbox-proxy`）
+2. **绑定到 Worker**：Worker 详情 → Settings → Bindings → Add binding → D1 database
+   - Variable name：`DB`（必须与代码中 `D1_BINDING_NAME` 一致）
+   - D1 database：选刚创建的数据库
+3. **表自动创建**：首次访问时 Worker 自动建表（`proxy_config`），无需手动建表
 
-```json
-{
-  "代理名称1": "https://目标站点1/api路径",
-  "代理名称2": "https://目标站点2/api路径"
-}
-```
+> wrangler.toml 等价配置：
+> ```toml
+> [[d1_databases]]
+> binding = "DB"
+> database_name = "toolbox-proxy"
+> database_id = "你的数据库ID"
+> ```
+
+### 3. 配置管理密码（启用网页管理）
+
+Worker 详情 → Settings → Variables and Secrets → Add：
+- Type：`Secret`（推荐，加密存储）
+- Variable name：`ADMIN_PASSWORD`
+- Value：你的管理密码
+
+> 未配置 `ADMIN_PASSWORD` 时管理功能禁用，任何人无法通过页面增删配置（默认安全）
+
+### 4. 配置子域名透传（推荐）
+
+子域名方案需用自己的域名（`*.workers.dev` 不支持通配符子域名）：
+
+1. **通配符 DNS**：DNS → Records → Add record
+   - Type：`A`，Name：`*`，IPv4：`192.0.2.1`（占位 IP），Proxy status：🟠 Proxied
+2. **Worker 路由**：Worker → Settings → Triggers → Routes → Add route
+   - Route：`*.你的域名/*`
+   - Zone：选你的域名
+
+完成后 `1.你的域名`、`2.你的域名`... 自动全部生效，无需逐个添加。
+
+### 5. 添加配置
+
+访问 Worker 根路径 → 点右上角「管理」→ 输入密码 → 填名称 + URL → 添加/更新
 
 ## 📖 使用方法
 
-### 访问代理服务
+### 访问代理
 
-1. **查看代理列表**：访问 Worker 根路径（如 `https://your-worker-name.cloudflareworkers.com/`），您将看到所有配置的代理列表，包括每个代理的访问状态
-2. **查看访问状态**：每个代理条目后面会显示访问状态，绿色的 "✅无需代理" 表示可以直接访问，红色的 "需代理" 表示需要通过代理访问
-3. **使用代理**：通过路径访问具体代理，如 `https://your-worker-name.cloudflareworkers.com/1` 对应第一个代理目标
+| 方式 | 地址 | 说明 |
+|------|------|------|
+| 子域名透传（推荐） | `https://1.你的域名/` | 整站代理，下级菜单/链接正常 |
+| 子域名子路径 | `https://1.你的域名/任意路径` | 透传到目标站对应路径 |
+| 路径代理（兼容） | `https://你的域名/1` | 仅透传查询参数 |
+
+**根路径**：访问主域名 `https://你的域名/` 查看代理列表页。
+
+### 网页管理
+
+1. 点右上角「管理」→ 输入密码登录
+2. **添加**：填名称 + URL（顺序可空，自动追加到末尾）→ 添加/更新
+3. **编辑**：点某项「编辑」→ 表单自动回填 → 修改 → 添加/更新（同名覆盖）
+4. **删除**：点某项「删除」→ 确认
+
+> 登录态保存在 sessionStorage，刷新不丢失；点「退出管理」清除。
 
 ### 示例请求
 
 ```bash
-# 访问第一个代理目标
-curl https://your-worker-name.cloudflareworkers.com/1
+# 子域名整站代理（推荐）
+curl https://1.你的域名/
+curl "https://1.你的域名/api.php/provide/vod?ac=list"
 
-# 带参数的请求
-curl "https://your-worker-name.cloudflareworkers.com/2?param1=value1&param2=value2"
+# 路径代理（兼容）
+curl https://你的域名/1
+curl "https://你的域名/2?param=value"
 ```
 
 ## 🔧 配置说明
 
 ### 核心配置项
 
-在 `worker.js` 文件中，您可以修改以下配置项：
-
 | 配置项 | 说明 | 默认值 |
 |-------|------|-------|
-| `REMOTE_CONFIG_URL` | 远程配置文件的完整 URL | `https://raw.githubusercontent.com/jerryzwj/tvjson/refs/heads/main/dl.json` |
+| `D1_BINDING_NAME` | D1 绑定变量名 | `"DB"` |
+| `ADMIN_PATH_PREFIX` | 管理接口路径前缀 | `"/__admin"` |
 | `TIMEOUT` | 请求超时时间（毫秒） | `10000` (10秒) |
-| `CACHE_TTL` | 缓存时间（秒） | `300` (5分钟) |
+| `CACHE_TTL` | 配置内存缓存 + 代理边缘缓存（秒） | `300` (5分钟) |
+| `ADMIN_PASSWORD` | 管理密码（环境变量，Worker 设置中配置） | 未配置则禁用管理 |
 
-### 远程配置文件格式
+### D1 数据表结构（自动创建）
 
-远程配置文件必须是标准的 JSON 对象，键为代理名称，值为代理目标 URL：
-
-```json
-{
-  "代理名称": "代理目标 URL"
-}
+```sql
+CREATE TABLE IF NOT EXISTS proxy_config (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  target_url TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 ```
+
+常用 SQL（也可在 D1 Console 直接执行）：
+
+```sql
+-- 查询全部
+SELECT name, target_url, sort_order FROM proxy_config ORDER BY sort_order;
+
+-- 新增
+INSERT INTO proxy_config (name, target_url, sort_order) VALUES ('示例', 'https://example.com/api', 1);
+
+-- 修改
+UPDATE proxy_config SET target_url='新地址' WHERE name='示例';
+
+-- 删除
+DELETE FROM proxy_config WHERE name='示例';
+```
+
+### 管理接口（API）
+
+所有接口需在请求头带 `X-Admin-Password`：
+
+| 方法 | 路径 | 功能 | 请求体 |
+|------|------|------|--------|
+| GET | `/__admin/config` | 列出全部配置 | — |
+| POST | `/__admin/config` | 添加/更新 | `{action:"add", name, target_url, sort_order?}` |
+| POST | `/__admin/config` | 删除 | `{action:"delete", name}` |
 
 ## 🛠️ 技术实现
 
 ### 核心流程
 
-1. **拉取远程配置**：服务启动时从远程 URL 拉取配置文件
-2. **解析配置**：将配置解析为代理列表
-3. **处理请求**：根据访问路径匹配对应的代理目标
-4. **代理转发**：将请求转发到目标站点，并处理响应
-5. **返回结果**：将代理响应返回给客户端，添加必要的头信息
+1. **管理分流**：请求优先匹配 `/__admin/*` 管理接口（密码鉴权）
+2. **子域名代理**：`N.域名/路径` → 基于目标站 origin 透传对应路径
+3. **路径代理**：`域名/N` → 透传查询参数到目标站（兼容）
+4. **列表页**：主域名根路径渲染代理列表 + 管理面板
+5. **配置读取**：D1 查询 + 5 分钟内存缓存，增删后即时失效
 
 ### 关键技术点
 
-- **Cloudflare Workers**：无服务器执行环境，提供全球边缘部署
-- **Fetch API**：用于发起 HTTP 请求
-- **Promise.race**：实现请求超时控制
-- **客户端检测**：浏览器端使用 Fetch API 和 AbortController 测试地址可访问性
-- **响应处理**：修改响应头，添加跨域支持和缓存控制
+- **Cloudflare D1**：SQLite 数据库，存储代理配置
+- **子域名透传**：基于 hostname 首段数字识别，整站路径透传，下级链接天然闭环
+- **INSERT OR REPLACE**：同名配置覆盖，实现"编辑"语义
+- **内存缓存 + 即时失效**：模块级变量缓存，增删后 `invalidateConfigCache` 清空
+- **Promise.race**：请求超时控制
 
 ## 📁 项目结构
 
@@ -118,35 +182,40 @@ MSProxy/
 
 ## 🔍 常见问题
 
-### Q: 代理服务启动失败怎么办？
+### Q: 访问显示"代理服务启动失败"？
 
-**A:** 检查以下几点：
-- 远程配置文件 URL 是否正确
-- 配置文件是否公网可访问
-- 配置文件格式是否为标准 JSON
+**A:** 检查：
+- Worker 是否已绑定 D1 数据库（变量名 `DB`）
+- proxy_config 表是否有数据（首次需通过管理面板或 SQL 添加）
 
-### Q: 代理请求失败怎么办？
+### Q: 子域名 `1.域名` 无法访问？
 
-**A:** 检查以下几点：
-- 目标站点是否可访问
-- 目标站点是否有访问限制
-- 网络连接是否正常
+**A:** 子域名方案必须：
+- 使用自己的域名（`*.workers.dev` 不支持通配符子域名）
+- 配置通配符 DNS（`*` 记录，开启 Proxied）
+- 配置 Worker 路由（`*.域名/*`）
 
-### Q: 如何更新代理配置？
+### Q: 管理功能点不动 / 提示 403？
 
-**A:** 只需更新远程 JSON 配置文件即可，服务会自动加载新配置（最多延迟 5 分钟，取决于缓存时间）。
+**A:** 未配置 `ADMIN_PASSWORD` 环境变量时管理功能禁用。在 Worker Settings → Variables and Secrets 添加即可。
+
+### Q: 如何修改/编辑配置？
+
+**A:** 两种方式：
+- 网页：点「编辑」按钮，表单回填后修改提交
+- SQL：`UPDATE proxy_config SET target_url='新地址' WHERE name='名称';`
+
+### Q: 添加配置后多久生效？
+
+**A:** 立即生效。增删改操作会清空内存缓存，下次请求即读最新数据。
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证，详见 LICENSE 文件。
+本项目采用 MIT 许可证。
 
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request 来改进这个项目！
-
-## 📞 联系方式
-
-如有问题或建议，请通过 GitHub Issues 与我们联系。
 
 ---
 
