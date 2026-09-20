@@ -1,17 +1,18 @@
 # Toolbox - 实用工具集合
 
-> 基于 Cloudflare Workers 的实用工具集合，并包含 NAS 上的 Docker 一键部署脚本
+> 基于 Cloudflare Workers / Pages 的实用工具集合，并包含 NAS 上的 Docker 一键部署脚本
 
 ## 📋 项目简介
 
-Toolbox 是一个实用工具集合，包含四个项目：
+Toolbox 是一个实用工具集合，包含五个项目：
 
 1. **DPNAddress** - 基于 D1 数据库的链接管理与重定向服务
 2. **Homepage** - 个人网址导航服务，支持书签分类管理
 3. **MSProxy** - 多站代理服务，D1 配置 + 子域名透传 + 网页可视化管理
 4. **YutuCMS** - 玉兔CMS 在飞牛 NAS 上的 Docker 一键部署脚本
+5. **ip-nav-cloudflare** - IP 导航页：设备/IP/端口三级管理，Cloudflare Pages + D1 持久化
 
-前三个工具运行在 Cloudflare Workers 上，具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
+DPNAddress、Homepage、MSProxy 运行在 Cloudflare Workers 上，ip-nav-cloudflare 运行在 Cloudflare Pages 上，均具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
 
 ## 📁 项目结构
 
@@ -30,6 +31,10 @@ Toolbox/
 │   └── README.md        # 项目文档
 ├── YutuCMS/             # 玉兔CMS 飞牛NAS 一键部署
 │   ├── deploy.sh        # Docker 一键部署脚本
+│   └── README.md        # 项目文档
+├── ip-nav-cloudflare/   # IP 导航服务（Pages + D1）
+│   ├── public/          # 前端页面
+│   ├── functions/       # Pages Functions API
 │   └── README.md        # 项目文档
 ├── README.md            # 本文件 - 项目总览
 └── 其他文档文件...
@@ -134,13 +139,36 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 
 > 详见 [YutuCMS/README.md](YutuCMS/README.md)
 
+### 5. ip-nav-cloudflare - IP 导航服务
+
+**核心功能**：
+- 设备 → IP → 端口 三级管理，IP 和端口都绑定设备
+- 设备下拉 → IP下拉 → 端口卡片，点击卡片跳转 `http://选中IP:端口`
+- 数据存储于 Cloudflare D1 数据库，持久化不丢失
+- 删除操作需密码（环境变量 `DELETE_PASSWORD`），删除设备时级联删除其 IP 和端口
+- 深色响应式界面，适配电脑与手机
+
+**技术栈**：
+- Cloudflare Pages + Functions
+- Cloudflare D1 数据库
+- JavaScript (ES Module)
+- HTML5/CSS3
+
+**使用方法**：
+1. 按 [ip-nav-cloudflare/README.md](ip-nav-cloudflare/README.md) 部署到 Cloudflare Pages
+2. 创建 D1 数据库并执行 `schema.sql`，在 Pages 项目中绑定（变量名 `DB`）
+3. 设置环境变量 `DELETE_PASSWORD`（Secret），删除操作需输入该密码
+4. 访问 Pages 域名：添加设备 → 添加IP → 添加端口，点击端口卡片跳转
+
+> 详见 [ip-nav-cloudflare/README.md](ip-nav-cloudflare/README.md)
+
 ## 🔧 部署指南
 
 ### 前提条件
 
-- Cloudflare 账户（DPNAddress / Homepage / MSProxy）
+- Cloudflare 账户（DPNAddress / Homepage / MSProxy / ip-nav-cloudflare）
 - 飞牛 NAS fnOS X86 + Docker（YutuCMS）
-- 对于 DPNAddress / MSProxy：Cloudflare D1 数据库
+- 对于 DPNAddress / MSProxy / ip-nav-cloudflare：Cloudflare D1 数据库
 - 对于 Homepage：Cloudflare KV 存储
 
 ### 通用部署步骤（Cloudflare Workers 项目）
@@ -160,6 +188,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
    - 点击 "Save and Deploy"
 
 > YutuCMS 为 NAS 本地 Docker 部署，见其 [README](YutuCMS/README.md)。
+> ip-nav-cloudflare 为 Cloudflare Pages 项目（含 Functions），部署方式不同，详见其 [README](ip-nav-cloudflare/README.md)。
 
 ## 📱 Android 客户端
 
@@ -191,6 +220,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 Homepage：在界面上直接添加、编辑或删除书签
 - 对于 MSProxy：访问根路径点「管理」，在网页上增/删/改配置（即时生效）
 - 对于 YutuCMS：修改 `deploy.sh` 顶部配置变量后重新执行
+- 对于 ip-nav-cloudflare：在页面上添加设备/IP/端口，删除需输入密码
 
 ### Q: 如何提高安全性？
 
@@ -198,6 +228,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 Homepage / MSProxy：设置强管理密码并定期更换
 - 对于 DPNAddress：考虑添加访问控制，限制只有特定 IP 可以修改链接
 - 对于 MSProxy：避免代理敏感内容，定期检查代理目标
+- 对于 ip-nav-cloudflare：设置强删除密码（`DELETE_PASSWORD`）并定期更换
 
 ## 📄 许可证
 
