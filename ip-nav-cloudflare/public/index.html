@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IP单选导航</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%233182ce'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='white' stroke-width='1.6'/%3E%3Cpath d='M12 2v4M12 18v4M2 12h4M18 12h4' stroke='white' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,sans-serif}
+body{background:#121417;color:#eee;padding:24px;max-width:1200px;margin:0 auto}
+h1{text-align:center;margin-bottom:20px;font-size:22px}
+
+/* 折叠子菜单 */
+.submenu-wrap{margin-bottom:24px}
+.submenu-toggle{width:100%;padding:12px 16px;background:#272c33;border:1px solid #383e48;border-radius:10px;text-align:left;cursor:pointer;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.submenu-toggle:hover{background:#2c3138}
+.submenu-content{margin-top:10px;padding:16px;background:#1a1e23;border-radius:10px;border:1px solid #333;display:none}
+.submenu-content.open{display:block}
+.sub-divider{height:1px;background:#333;margin:14px 0}
+.sub-block h3{font-size:15px;margin-bottom:10px}
+
+.form-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+input, select{padding:9px 12px;background:#2c3138;border:1px solid #444;border-radius:8px;color:#fff;font-size:14px;outline:none}
+input:focus, select:focus{border-color:#4299e1}
+button{padding:9px 14px;border:none;border-radius:8px;cursor:pointer;font-size:14px}
+.btn-add{background:#3182ce;color:#fff}
+.btn-del{background:#c53030;color:#fff}
+
+/* 主容器 */
+.main-wrap{background:#1e2227;padding:24px;border-radius:12px;border:1px solid #333;display:flex;flex-direction:column;gap:24px}
+.select-row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.select-block h2{font-size:17px;margin-bottom:12px}
+.select-row select{width:100%;max-width:340px}
+.ip-tip{margin-top:8px;color:#a0aec0;font-size:13px}
+.nav-area h2{font-size:17px;margin-bottom:16px}
+.nav-buttons{display:grid;grid-template-columns:repeat(auto-fill, minmax(160px,1fr));gap:12px}
+.nav-btn{padding:16px;background:#2c3138;border-radius:10px;text-align:center;cursor:pointer;border:1px solid #444;transition:0.2s}
+.nav-btn:hover{border-color:#4299e1;background:#253447}
+.nav-btn .port-text{color:#a0aec0;font-size:13px;margin-top:4px}
+.nav-tip{margin-top:12px;color:#a0aec0;font-size:13px}
+.empty-tip{color:#a0aec0;font-size:14px;text-align:center;padding:24px 0;grid-column:1/-1}
+
+@media (max-width:640px){
+  body{padding:16px}
+  .form-row{flex-direction:column}
+  .form-row button{width:100%}
+  .select-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<h1>IP单选导航</h1>
+
+<!-- ===== 折叠子菜单：添加配置 ===== -->
+<div class="submenu-wrap">
+  <div class="submenu-toggle" id="submenuToggle">
+    <span>添加配置</span>
+    <span id="arrow">▼</span>
+  </div>
+  <div class="submenu-content" id="submenuBox">
+    <div class="sub-block">
+      <h3>添加设备</h3>
+      <div class="form-row">
+        <input id="inp-device" placeholder="设备名称，如 客厅软路由">
+        <button class="btn-add" onclick="addDevice()">添加设备</button>
+      </div>
+    </div>
+    <div class="sub-divider"></div>
+    <div class="sub-block">
+      <h3>添加IP（绑定设备）</h3>
+      <div class="form-row">
+        <select id="ip-device"></select>
+        <input id="inp-ip" placeholder="IP地址，如 192.168.1.5">
+        <button class="btn-add" onclick="addIp()">添加IP</button>
+      </div>
+    </div>
+    <div class="sub-divider"></div>
+    <div class="sub-block">
+      <h3>添加端口（绑定设备）</h3>
+      <div class="form-row">
+        <select id="nav-device"></select>
+        <input id="inp-nav-name" placeholder="服务名称，如 管理后台">
+        <input id="inp-nav-port" placeholder="端口，如 8080">
+        <button class="btn-add" onclick="addNav()">添加端口</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 主区域：设备 -> IP -> 端口 ===== -->
+<div class="main-wrap">
+  <div class="select-row">
+    <div class="select-block">
+      <h2>1. 选择设备</h2>
+      <div class="form-row">
+        <select id="deviceSelect">
+          <option value="">-- 请选择设备 --</option>
+        </select>
+        <button class="btn-del" onclick="deleteSelectedDevice()">删除设备</button>
+      </div>
+    </div>
+    <div class="select-block">
+      <h2>2. 选择IP</h2>
+      <div class="form-row">
+        <select id="ipSelect" disabled>
+          <option value="">-- 请选择IP --</option>
+        </select>
+        <button class="btn-del" onclick="deleteSelectedIp()">删除选中IP</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-area">
+    <h2>3. 端口卡片</h2>
+    <div class="nav-buttons" id="navBox"></div>
+    <div class="nav-tip">先选设备，再选该设备的IP，点击端口卡片跳转 http://IP:端口（删除操作需密码）</div>
+  </div>
+</div>
+
+<script>
+let devices = [];
+let ips = [];
+let navs = [];
+let selectedDeviceId = null;
+let selectedIpId = null;
+
+// ===== 数据加载 =====
+async function loadData(){
+  try{
+    const [devRes, ipsRes, navsRes] = await Promise.all([
+      fetch('/api/devices'),
+      fetch('/api/ips'),
+      fetch('/api/navs')
+    ]);
+    if(!devRes.ok || !ipsRes.ok || !navsRes.ok) throw new Error('HTTP ' + devRes.status + ' / ' + ipsRes.status + ' / ' + navsRes.status);
+    devices = await devRes.json();
+    ips = await ipsRes.json();
+    navs = await navsRes.json();
+  }catch(e){
+    alert('数据加载失败：请确认已部署到 Cloudflare Pages，且 D1 绑定变量名为 DB');
+    console.error(e);
+  }
+  // 修正失效的选中状态
+  if(selectedDeviceId && !devices.find(d => d.id === selectedDeviceId)) selectedDeviceId = null;
+  if(!selectedDeviceId) selectedIpId = null;
+  if(selectedIpId && !ips.find(i => i.id === selectedIpId && i.device_id === selectedDeviceId)) selectedIpId = null;
+  renderAll();
+}
+
+// ===== 子菜单折叠 =====
+const submenuToggle = document.getElementById('submenuToggle');
+const submenuBox = document.getElementById('submenuBox');
+const arrow = document.getElementById('arrow');
+submenuToggle.onclick = function(){
+  submenuBox.classList.toggle('open');
+  arrow.innerText = submenuBox.classList.contains('open') ? '▲' : '▼';
+};
+
+// ===== 渲染：设备下拉 =====
+const deviceSelect = document.getElementById('deviceSelect');
+function renderDeviceSelect(){
+  deviceSelect.innerHTML = '<option value="">-- 请选择设备 --</option>';
+  devices.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.innerText = d.name;
+    if(selectedDeviceId === d.id) opt.selected = true;
+    deviceSelect.appendChild(opt);
+  });
+}
+deviceSelect.onchange = function(){
+  selectedDeviceId = this.value ? Number(this.value) : null;
+  selectedIpId = null;
+  renderIpSelect();
+  renderNav();
+};
+
+// ===== 渲染：IP下拉（按设备过滤） =====
+const ipSelect = document.getElementById('ipSelect');
+function renderIpSelect(){
+  ipSelect.innerHTML = '<option value="">-- 请选择IP --</option>';
+  if(!selectedDeviceId){
+    ipSelect.disabled = true;
+    return;
+  }
+  ipSelect.disabled = false;
+  ips.filter(i => i.device_id === selectedDeviceId).forEach(ip => {
+    const opt = document.createElement('option');
+    opt.value = ip.id;
+    opt.innerText = ip.value;
+    if(selectedIpId === ip.id) opt.selected = true;
+    ipSelect.appendChild(opt);
+  });
+}
+ipSelect.onchange = function(){
+  selectedIpId = this.value ? Number(this.value) : null;
+};
+
+// ===== 渲染：端口卡片（按设备过滤） =====
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function renderNav(){
+  const box = document.getElementById('navBox');
+  box.innerHTML = '';
+  if(!selectedDeviceId){
+    box.innerHTML = '<div class="empty-tip">请先在上方选择设备</div>';
+    return;
+  }
+  const list = navs.filter(n => n.device_id === selectedDeviceId);
+  if(list.length === 0){
+    box.innerHTML = '<div class="empty-tip">该设备还没有端口，点上方「添加配置」添加</div>';
+    return;
+  }
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'nav-btn';
+    div.innerHTML = `
+      <div>${escapeHtml(item.name)}</div>
+      <div class="port-text">:${escapeHtml(item.port)}</div>
+      <button class="btn-del" style="margin-top:8px;padding:4px 8px;font-size:12px" onclick="delNav(${item.id})">删除</button>
+    `;
+    div.onclick = (e) => {
+      if(e.target.tagName !== 'BUTTON'){
+        const ip = ips.find(i => i.id === selectedIpId && i.device_id === selectedDeviceId);
+        if(!ip){
+          alert('请先选择该设备的IP地址');
+          return;
+        }
+        const url = 'http://' + ip.value + ':' + item.port;
+        window.open(url, '_blank');
+      }
+    };
+    box.appendChild(div);
+  });
+}
+
+// ===== 渲染：子菜单中的设备下拉 =====
+function renderSubDeviceSelects(){
+  const s1 = document.getElementById('ip-device');
+  const s2 = document.getElementById('nav-device');
+  s1.innerHTML = '<option value="">选择设备</option>';
+  s2.innerHTML = '<option value="">选择设备</option>';
+  devices.forEach(d => {
+    const o1 = document.createElement('option');
+    o1.value = d.id; o1.innerText = d.name;
+    s1.appendChild(o1);
+    const o2 = document.createElement('option');
+    o2.value = d.id; o2.innerText = d.name;
+    s2.appendChild(o2);
+  });
+  if(selectedDeviceId){
+    s1.value = selectedDeviceId;
+    s2.value = selectedDeviceId;
+  }
+}
+
+function renderAll(){
+  renderDeviceSelect();
+  renderIpSelect();
+  renderNav();
+  renderSubDeviceSelects();
+}
+
+// ===== 删除通用流程（需密码） =====
+async function requestDelete(url, tip){
+  if(!confirm(tip)) return null;
+  const password = prompt('请输入删除密码：');
+  if(password === null) return null;
+  try{
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {'x-delete-password': password}
+    });
+    const data = await res.json().catch(() => null);
+    if(!res.ok){
+      alert((data && data.error) ? data.error : '删除失败：HTTP ' + res.status);
+      return null;
+    }
+    return true;
+  }catch(e){
+    alert('删除失败：' + e.message);
+    return null;
+  }
+}
+
+// ===== 设备操作 =====
+async function addDevice(){
+  const name = document.getElementById('inp-device').value.trim();
+  if(!name) return alert('设备名称不能为空');
+  try{
+    const res = await fetch('/api/devices', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name})
+    });
+    if(res.status === 409) return alert('该设备名称已存在');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const row = await res.json();
+    devices.push(row);
+    selectedDeviceId = row.id;
+    selectedIpId = null;
+    renderAll();
+    document.getElementById('inp-device').value = '';
+  }catch(e){
+    alert('添加设备失败：' + e.message);
+  }
+}
+
+async function deleteSelectedDevice(){
+  if(!selectedDeviceId) return alert('请先选择设备');
+  const dev = devices.find(d => d.id === selectedDeviceId);
+  const ok = await requestDelete(
+    '/api/devices/' + selectedDeviceId,
+    '确定删除设备「' + (dev ? dev.name : '') + '」及其全部IP和端口？此操作不可恢复'
+  );
+  if(!ok) return;
+  devices = devices.filter(d => d.id !== selectedDeviceId);
+  ips = ips.filter(i => i.device_id !== selectedDeviceId);
+  navs = navs.filter(n => n.device_id !== selectedDeviceId);
+  selectedDeviceId = null;
+  selectedIpId = null;
+  renderAll();
+}
+
+// ===== IP操作 =====
+async function addIp(){
+  const deviceId = Number(document.getElementById('ip-device').value);
+  const value = document.getElementById('inp-ip').value.trim();
+  if(!deviceId) return alert('请选择所属设备');
+  if(!value) return alert('IP地址不能为空');
+  try{
+    const res = await fetch('/api/ips', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({device_id: deviceId, value: value})
+    });
+    if(res.status === 409) return alert('该设备下已存在相同IP');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const row = await res.json();
+    ips.push(row);
+    if(selectedDeviceId === deviceId) selectedIpId = row.id;
+    renderIpSelect();
+    renderNav();
+    document.getElementById('inp-ip').value = '';
+  }catch(e){
+    alert('添加IP失败：' + e.message);
+  }
+}
+
+async function deleteSelectedIp(){
+  if(!selectedIpId) return alert('请先选择要删除的IP');
+  const ip = ips.find(i => i.id === selectedIpId);
+  const label = ip ? ip.value : '';
+  const ok = await requestDelete('/api/ips/' + selectedIpId, '确定删除IP：' + label + ' ？');
+  if(!ok) return;
+  ips = ips.filter(i => i.id !== selectedIpId);
+  selectedIpId = null;
+  renderIpSelect();
+  renderNav();
+}
+
+// ===== 端口操作 =====
+async function addNav(){
+  const deviceId = Number(document.getElementById('nav-device').value);
+  const name = document.getElementById('inp-nav-name').value.trim();
+  const port = document.getElementById('inp-nav-port').value.trim();
+  if(!deviceId) return alert('请选择所属设备');
+  if(!name || !port) return alert('服务名称和端口不能为空');
+  try{
+    const res = await fetch('/api/navs', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({device_id: deviceId, name: name, port: port})
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const row = await res.json();
+    navs.push(row);
+    renderNav();
+    document.getElementById('inp-nav-name').value = '';
+    document.getElementById('inp-nav-port').value = '';
+  }catch(e){
+    alert('添加端口失败：' + e.message);
+  }
+}
+
+async function delNav(id){
+  const item = navs.find(n => n.id === id);
+  const label = item ? (item.name + ' :' + item.port) : '';
+  const ok = await requestDelete('/api/navs/' + id, '确定删除端口：' + label + ' ？');
+  if(!ok) return;
+  navs = navs.filter(n => n.id !== id);
+  renderNav();
+}
+
+// ===== 初始化 =====
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+name = "ip-nav"
+compatibility_date = "2024-09-23"
+
+[pages]
+build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ip-nav-db"
+database_id = "8b50f63a-fcd3-4198-9b76-7fe4d4016a13"

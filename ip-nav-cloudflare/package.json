@@ -1,0 +1,8 @@
+{
+  "name": "ip-nav-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/api-smoke.mjs"
+  }
+}
