@@ -1,0 +1,20 @@
+# 临时文件中转站 · Cloudflare Worker + R2
+# 部署：npx wrangler deploy
+name = "temp-file-share"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# R2 存储桶绑定（变量名 R2_BUCKET 与代码中一致）
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "temp-share"
+
+# 每小时清理一次过期文件
+[triggers]
+crons = ["17 * * * *"]
+
+[vars]
+TURNSTILE_SITEKEY = "0x4AAAAAAFYM49JF01aa3bWT"
+MAX_MB = "100"
+DEFAULT_EXPIRE_HOURS = "720"
