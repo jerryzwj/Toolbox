@@ -4,15 +4,16 @@
 
 ## 📋 项目简介
 
-Toolbox 是一个实用工具集合，包含五个项目：
+Toolbox 是一个实用工具集合，包含六个项目：
 
 1. **DPNAddress** - 基于 D1 数据库的链接管理与重定向服务
 2. **Homepage** - 个人网址导航服务，支持书签分类管理
 3. **MSProxy** - 多站代理服务，D1 配置 + 子域名透传 + 网页可视化管理
 4. **YutuCMS** - 玉兔CMS 在飞牛 NAS 上的 Docker 一键部署脚本
 5. **ip-nav-cloudflare** - IP 导航页：设备/IP/端口三级管理，Cloudflare Pages + D1 持久化
+6. **TempFileShare** - 临时文件中转站：免登录上传、直链分享，文件清单存服务器端，Worker + R2 + Turnstile
 
-DPNAddress、Homepage、MSProxy 运行在 Cloudflare Workers 上，ip-nav-cloudflare 运行在 Cloudflare Pages 上，均具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
+DPNAddress、Homepage、MSProxy、TempFileShare 运行在 Cloudflare Workers 上，ip-nav-cloudflare 运行在 Cloudflare Pages 上，均具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
 
 ## 📁 项目结构
 
@@ -35,6 +36,14 @@ Toolbox/
 ├── ip-nav-cloudflare/   # IP 导航服务（Pages + D1）
 │   ├── public/          # 前端页面
 │   ├── functions/       # Pages Functions API
+│   └── README.md        # 项目文档
+├── TempFileShare/       # 临时文件中转站（Worker + R2 + Turnstile）
+│   ├── src/index.js     # Worker 全部逻辑（含内联上传页）
+│   ├── wrangler.toml    # 部署配置（R2 绑定、定时触发、环境变量）
+│   ├── test-e2e.mjs     # HTTP 层回归测试
+│   ├── check-page.mjs   # 页面自检
+│   ├── verify-live.mjs  # 线上页面校验
+│   ├── test-cron.ps1    # 定时清理验证
 │   └── README.md        # 项目文档
 ├── README.md            # 本文件 - 项目总览
 └── 其他文档文件...
@@ -162,14 +171,40 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 
 > 详见 [ip-nav-cloudflare/README.md](ip-nav-cloudflare/README.md)
 
+### 6. TempFileShare - 临时文件中转站
+
+**核心功能**：
+- **免登录、打开即用**：拖文件上传，拿到直链发人，对方点开即下载
+- 文件清单**存在服务器端**（直接 list R2，无需额外索引），任何设备打开都看到同一份，可二次下载 / 复制链接 / 删除
+- 每个文件带**真实上传进度条**（已传 / 总量、百分比、速度）
+- 保存时长可选 1 小时 / 24 小时 / 7 天 / 1 个月，默认 1 个月
+- Cron 每小时清理过期文件；过期链接被访问时也会立即删除
+- Turnstile 人机验证防刷：上传前先换一张 10 分钟有效的操作凭证
+
+**技术栈**：
+- Cloudflare Workers
+- Cloudflare R2 存储桶
+- Cloudflare Turnstile 人机验证
+- JavaScript (ES Module)，页面样式内联、不依赖构建
+
+**使用方法**：
+1. `npm i -D wrangler` 后执行 `npx wrangler deploy`（配置见 `wrangler.toml`）
+2. 创建 R2 存储桶并绑定，变量名 `R2_BUCKET`
+3. 设置变量 `TURNSTILE_SITEKEY`（人机验证公钥）与密钥 `TURNSTILE_SECRET`（私钥，同时用作上传凭证签名）；留空则关闭人机验证
+4. 可选：绑定自定义域名。**新增域名后必须把域名加进 Turnstile 白名单**，否则上传会被拦
+5. 可选：`MAX_MB` 改单文件上限（默认 100），`DEFAULT_EXPIRE_HOURS` 改默认保存时长（默认 720）
+
+> 详见 [TempFileShare/README.md](TempFileShare/README.md)
+
 ## 🔧 部署指南
 
 ### 前提条件
 
-- Cloudflare 账户（DPNAddress / Homepage / MSProxy / ip-nav-cloudflare）
+- Cloudflare 账户（DPNAddress / Homepage / MSProxy / TempFileShare / ip-nav-cloudflare）
 - 飞牛 NAS fnOS X86 + Docker（YutuCMS）
 - 对于 DPNAddress / MSProxy / ip-nav-cloudflare：Cloudflare D1 数据库
 - 对于 Homepage：Cloudflare KV 存储
+- 对于 TempFileShare：Cloudflare R2 存储桶 + Turnstile 人机验证组件
 
 ### 通用部署步骤（Cloudflare Workers 项目）
 
@@ -181,6 +216,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 3. **配置绑定**：
    - 对于 DPNAddress / MSProxy：添加 D1 数据库绑定，名称为 `DB`
    - 对于 Homepage：添加 KV 命名空间绑定，名称为 `BOOKMARKS_KV`
+   - 对于 TempFileShare：添加 R2 存储桶绑定，名称为 `R2_BUCKET`；并设置 `TURNSTILE_SITEKEY` 变量与 `TURNSTILE_SECRET` 密钥
 4. **部署代码**：
    - 进入 Worker 编辑页面
    - 复制对应项目的 Worker 代码到编辑器
@@ -189,6 +225,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 
 > YutuCMS 为 NAS 本地 Docker 部署，见其 [README](YutuCMS/README.md)。
 > ip-nav-cloudflare 为 Cloudflare Pages 项目（含 Functions），部署方式不同，详见其 [README](ip-nav-cloudflare/README.md)。
+> TempFileShare 需要 R2 与 Turnstile，推荐用 wrangler CLI 部署，详见其 [README](TempFileShare/README.md)。
 
 ## 📱 Android 客户端
 
@@ -221,6 +258,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 MSProxy：访问根路径点「管理」，在网页上增/删/改配置（即时生效）
 - 对于 YutuCMS：修改 `deploy.sh` 顶部配置变量后重新执行
 - 对于 ip-nav-cloudflare：在页面上添加设备/IP/端口，删除需输入密码
+- 对于 TempFileShare：改 `wrangler.toml` 后重新 `npx wrangler deploy`（大小上限、默认时长、清理频率都在里面）
 
 ### Q: 如何提高安全性？
 
@@ -229,6 +267,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 DPNAddress：考虑添加访问控制，限制只有特定 IP 可以修改链接
 - 对于 MSProxy：避免代理敏感内容，定期检查代理目标
 - 对于 ip-nav-cloudflare：设置强删除密码（`DELETE_PASSWORD`）并定期更换
+- 对于 TempFileShare：保留 Turnstile 人机验证，不要删掉 `TURNSTILE_SECRET` 后还把地址公开；注意其文件清单默认是公开可见、可删除的
 
 ## 📄 许可证
 
