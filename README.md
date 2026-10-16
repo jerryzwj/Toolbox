@@ -4,7 +4,7 @@
 
 ## 📋 项目简介
 
-Toolbox 是一个实用工具集合，包含六个项目：
+Toolbox 是一个实用工具集合，包含七个项目：
 
 1. **DPNAddress** - 基于 D1 数据库的链接管理与重定向服务
 2. **Homepage** - 个人网址导航服务，支持书签分类管理
@@ -12,8 +12,9 @@ Toolbox 是一个实用工具集合，包含六个项目：
 4. **YutuCMS** - 玉兔CMS 在飞牛 NAS 上的 Docker 一键部署脚本
 5. **ip-nav-cloudflare** - IP 导航页：设备/IP/端口三级管理，Cloudflare Pages + D1 持久化
 6. **TempFileShare** - 临时文件中转站：免登录上传、直链分享，文件清单存服务器端，Worker + R2 + Turnstile
+7. **DeviceCostTracker** - 设备成本追踪：记录设备买入/卖出价与使用天数，自动算每日成本，Worker + D1
 
-DPNAddress、Homepage、MSProxy、TempFileShare 运行在 Cloudflare Workers 上，ip-nav-cloudflare 运行在 Cloudflare Pages 上，均具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
+DPNAddress、Homepage、MSProxy、TempFileShare、DeviceCostTracker 运行在 Cloudflare Workers 上，ip-nav-cloudflare 运行在 Cloudflare Pages 上，均具有全球边缘部署、低延迟访问的优势；YutuCMS 为飞牛 NAS 本地 Docker 部署方案。
 
 ## 📁 项目结构
 
@@ -45,6 +46,12 @@ Toolbox/
 │   ├── verify-live.mjs  # 线上页面校验
 │   ├── test-cron.ps1    # 定时清理验证
 │   └── README.md        # 项目文档
+├── DeviceCostTracker/   # 设备成本追踪（Worker + D1）
+│   ├── public/index.html  # 前端页面（单文件，样式与逻辑内联）
+│   ├── src/index.js       # Worker API（增删改查 /api/devices）
+│   ├── schema.sql         # D1 建表语句
+│   ├── wrangler.toml      # 部署配置（D1 绑定）
+│   └── README.md          # 项目文档
 ├── README.md            # 本文件 - 项目总览
 └── 其他文档文件...
 ```
@@ -196,13 +203,37 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 
 > 详见 [TempFileShare/README.md](TempFileShare/README.md)
 
+### 7. DeviceCostTracker - 设备成本追踪
+
+**核心功能**：
+- 记录每台设备的买入价与买入日期，退役时填卖出价（可为 0）
+- 自动计算使用天数与**每日成本**：`(买入价 − 卖出价) ÷ 使用天数`
+- 卡片区分「使用中 / 已退役」，退役设备同时显示买入价与卖出价（绿色）
+- 顶部统计：使用中台数、今日总成本、累计退役、设备合计价格、售出合计价格
+- 数据存 Cloudflare D1，跨设备同步；深色响应式界面，手机电脑通用
+- 可选访问密码（`ADMIN_PASSWORD`），未设置则页面公开
+
+**技术栈**：
+- Cloudflare Workers
+- Cloudflare D1 数据库
+- JavaScript (ES Module)
+- HTML5/CSS3
+
+**使用方法**：
+1. `npx wrangler d1 create device-cost-tracker` 创建数据库，把返回的 `database_id` 填进 `wrangler.toml`
+2. `npx wrangler d1 execute device-cost-tracker --remote --file=./schema.sql` 建表
+3. `npx wrangler deploy` 部署
+4. 可选：`npx wrangler secret put ADMIN_PASSWORD` 设置访问密码；在控制台绑定自定义域名
+
+> 详见 [DeviceCostTracker/README.md](DeviceCostTracker/README.md)
+
 ## 🔧 部署指南
 
 ### 前提条件
 
-- Cloudflare 账户（DPNAddress / Homepage / MSProxy / TempFileShare / ip-nav-cloudflare）
+- Cloudflare 账户（DPNAddress / Homepage / MSProxy / TempFileShare / ip-nav-cloudflare / DeviceCostTracker）
 - 飞牛 NAS fnOS X86 + Docker（YutuCMS）
-- 对于 DPNAddress / MSProxy / ip-nav-cloudflare：Cloudflare D1 数据库
+- 对于 DPNAddress / MSProxy / ip-nav-cloudflare / DeviceCostTracker：Cloudflare D1 数据库
 - 对于 Homepage：Cloudflare KV 存储
 - 对于 TempFileShare：Cloudflare R2 存储桶 + Turnstile 人机验证组件
 
@@ -214,7 +245,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
    - 点击 "Create Worker"
    - 命名你的 Worker，然后点击 "Deploy"
 3. **配置绑定**：
-   - 对于 DPNAddress / MSProxy：添加 D1 数据库绑定，名称为 `DB`
+   - 对于 DPNAddress / MSProxy / DeviceCostTracker：添加 D1 数据库绑定，名称为 `DB`
    - 对于 Homepage：添加 KV 命名空间绑定，名称为 `BOOKMARKS_KV`
    - 对于 TempFileShare：添加 R2 存储桶绑定，名称为 `R2_BUCKET`；并设置 `TURNSTILE_SITEKEY` 变量与 `TURNSTILE_SECRET` 密钥
 4. **部署代码**：
@@ -226,6 +257,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 > YutuCMS 为 NAS 本地 Docker 部署，见其 [README](YutuCMS/README.md)。
 > ip-nav-cloudflare 为 Cloudflare Pages 项目（含 Functions），部署方式不同，详见其 [README](ip-nav-cloudflare/README.md)。
 > TempFileShare 需要 R2 与 Turnstile，推荐用 wrangler CLI 部署，详见其 [README](TempFileShare/README.md)。
+> DeviceCostTracker 含静态资源（`public/`）与 D1 绑定，推荐用 wrangler CLI 部署，详见其 [README](DeviceCostTracker/README.md)。
 
 ## 📱 Android 客户端
 
@@ -259,6 +291,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 YutuCMS：修改 `deploy.sh` 顶部配置变量后重新执行
 - 对于 ip-nav-cloudflare：在页面上添加设备/IP/端口，删除需输入密码
 - 对于 TempFileShare：改 `wrangler.toml` 后重新 `npx wrangler deploy`（大小上限、默认时长、清理频率都在里面）
+- 对于 DeviceCostTracker：在页面上增删改设备，退役时填退役日期与卖出价；改代码后重新 `npx wrangler deploy`
 
 ### Q: 如何提高安全性？
 
@@ -268,6 +301,7 @@ curl -fsSL https://raw.githubusercontent.com/jerryzwj/Toolbox/main/YutuCMS/deplo
 - 对于 MSProxy：避免代理敏感内容，定期检查代理目标
 - 对于 ip-nav-cloudflare：设置强删除密码（`DELETE_PASSWORD`）并定期更换
 - 对于 TempFileShare：保留 Turnstile 人机验证，不要删掉 `TURNSTILE_SECRET` 后还把地址公开；注意其文件清单默认是公开可见、可删除的
+- 对于 DeviceCostTracker：设置强访问密码（`ADMIN_PASSWORD`），避免设备与花销数据公开可改
 
 ## 📄 许可证
 
