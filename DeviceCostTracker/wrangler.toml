@@ -1,0 +1,16 @@
+name = "device-cost-tracker"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 静态资源（前端页面）
+[assets]
+directory = "./public"
+not_found_handling = "single-page-application"
+
+# D1 数据库绑定：先跑 npx wrangler d1 create device-cost-tracker
+# 再把返回的 database_id 填到下面
+[[d1_databases]]
+binding = "DB"
+database_name = "device-cost-tracker"
+database_id = "8b101686-df5b-4d60-b044-934fbb18981d"
