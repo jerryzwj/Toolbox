@@ -1,4 +1,4 @@
-# 验证「到期自动清理」定时任务
+﻿# 验证「到期自动清理」定时任务
 # 用法：powershell -File test-cron.ps1 <待清理对象的key>
 #
 # 原理：用 wrangler dev --remote --test-scheduled 起一个带真实绑定的
