@@ -301,13 +301,14 @@ function render() {
     list.innerHTML = devices.map(d => {
       const c = calcDevice(d);
       const isActive = !d.retire_date;
-      const priceLine = `买入 ¥${fmt(d.buy_price)}` +
-        (isActive ? '' : ` · <span class="sell-price">卖出 ¥${fmt(d.sell_price || 0)}</span>`);
+      const priceLines =
+        `<div class="device-meta">买入 ¥${fmt(d.buy_price)}</div>` +
+        (isActive ? '' : `<div class="device-meta"><span class="sell-price">卖出 ¥${fmt(d.sell_price || 0)}</span></div>`);
       return `<div class="device-card" data-id="${d.id}">
         <div class="device-icon">${d.icon}</div>
         <div class="device-info">
           <div class="device-name">${escapeHtml(d.name)}</div>
-          <div class="device-meta">${priceLine}</div>
+          ${priceLines}
           <div class="device-buy-date">¥${fmt(c.perDay)}/天 · 购入 ${d.buy_date}</div>
         </div>
         <div class="device-right">
